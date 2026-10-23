@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import logging
 import re
 
-from app.core.config import settings
+from fastapi import HTTPException
 from app.providers import LLMProvider, get_provider
 
 from app.schemas.chat import (
@@ -169,7 +169,28 @@ class AIService:
         request: ChatRequest,
     ) -> ChatResponse:
 
-        message = request.message.strip()
+
+        # -----------------------------------------------------
+        # 0. PROVIDER OVERRIDE VALIDATION
+        # -----------------------------------------------------
+        # If the client specifies a provider, validate it against the
+        # configured, usable providers and switch the service accordingly.
+        # This must happen before any other intent handling.
+        if request.provider:
+            usable_providers: list[str] = []
+            if settings.app_mode == "local":
+                usable_providers.append("ollama")
+            if settings.openai_api_key:
+                usable_providers.append("openai")
+            if request.provider not in usable_providers:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Provider '{request.provider}' is not configured or unavailable.",
+                )
+            # Switch to the requested provider for this request only.
+            self.provider = get_provider(request.provider)
+            self.extraction_service = ExtractionService(provider=self.provider)
+
         lower = message.lower()
 
         # -----------------------------------------------------

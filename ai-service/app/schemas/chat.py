@@ -44,6 +44,39 @@ class Intent(str, Enum):
 # =============================================================
 
 class ChatRequest(BaseModel):
+    """Payload for a chat request.
+
+    * ``message`` – the user message.
+    * ``conversation_id`` – optional identifier for multi‑turn state.
+    * ``provider`` – optional LLM provider name (``ollama`` or ``openai``).
+    """
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=5000,
+    )
+    conversation_id: str | None = Field(
+        default=None,
+        description="Optional client conversation identifier to track multi‑turn state",
+    )
+    provider: str | None = Field(
+        default=None,
+        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
+    )
+
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=5000,
+    )
+    conversation_id: str | None = Field(
+        default=None,
+        description="Optional client conversation identifier to track multi-turn state",
+    )
+    provider: str | None = Field(
+        default=None,
+        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
+    )
 
     message: str = Field(
         ...,
@@ -52,6 +85,42 @@ class ChatRequest(BaseModel):
     )
 
     conversation_id: str | None = Field(
+        default=None,
+        description="Optional client conversation identifier to track multi-turn state",
+    )
+
+    provider: str | None = Field(
+        default=None,
+        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
+    )
+
+
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=5000,
+    )
+
+    conversation_id: str | None = Field(
+        default=None,
+        description="Optional client conversation identifier to track multi-turn state",
+    )
+
+    provider: str | None = Field(
+        default=None,
+        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
+    )
+
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=5000,
+    )
+
+    provider: str | None = Field(
+        default=None,
+        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
+    )
         default=None,
         description="Optional client conversation identifier to track multi-turn state",
     )

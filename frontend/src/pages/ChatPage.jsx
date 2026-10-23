@@ -21,7 +21,207 @@ const WELCOME_MESSAGE = {
   event: null,
 };
 
+import { useEffect, useState } from "react";
+
+import ChatMessage from "../components/ChatMessage";
+import QuickCreateModal from "../components/QuickCreateModal";
+
+import {
+  sendMessage,
+} from "../services/aiApi";
+
+const CHAT_STORAGE_KEY = "ai-personal-ceo-chat-messages";
++const CONVERSATION_ID_KEY = "ai-personal-ceo-conversation-id";
+
+const WELCOME_MESSAGE = {
+  id: "welcome",
+  role: "assistant",
+  content:
+    "Hello! I'm your AI Personal Manager.\n\n" +
+    "I can create tasks, manage events, update your schedule, " +
+    "and help you decide what to focus on.",
+  intent: null,
+  task: null,
+  event: null,
+};
+
 function loadChatMessages() {
+  try {
+    const savedMessages = window.localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!savedMessages) {
+      return [WELCOME_MESSAGE];
+    }
+
+    const parsedMessages = JSON.parse(savedMessages);
+    if (
+      Array.isArray(parsedMessages) &&
+      parsedMessages.every(
+        (message) =>
+          message &&
+          typeof message.id === "string" &&
+          (message.role === "assistant" || message.role === "user") &&
+          typeof message.content === "string"
+      )
+    ) {
+      return parsedMessages;
+    }
+  } catch (error) {
+    console.warn("Unable to restore saved chat history.", error);
+  }
+
+  return [WELCOME_MESSAGE];
+}
+
+function loadConversationId() {
+  const stored = window.localStorage.getItem(CONVERSATION_ID_KEY);
+  if (stored) return stored;
+  const newId = crypto.randomUUID();
+  window.localStorage.setItem(CONVERSATION_ID_KEY, newId);
+  return newId;
+}
+
+function ChatPage() {
+  const [input, setInput] =
+    useState("");
+
+  const [messages, setMessages] =
+    useState(loadChatMessages);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [
+    quickCreateType,
+    setQuickCreateType,
+  ] = useState(null);
++
++  const [conversationId, setConversationId] = useState(loadConversationId);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        CHAT_STORAGE_KEY,
+-        JSON.stringify(messages)
++        // keep only the last 100 messages
++        JSON.stringify(messages.slice(-100))
+      );
+    } catch (error) {
+      console.error("Unable to save chat history.", error);
+    }
+  }, [messages]);
+
++  // Persist conversation ID when it changes (unlikely after initial load)
++  useEffect(() => {
++    window.localStorage.setItem(CONVERSATION_ID_KEY, conversationId);
++  }, [conversationId]);
+@@
+-    const response =
+-      await sendMessage(
+-        trimmedMessage
+-      );
++    const response =
++      await sendMessage(
++        trimmedMessage,
++        conversationId
++      );
+@@
+-  const handleSubmit = async (
+-    event
+-  ) => {
+-    event.preventDefault();
+-
+-    await sendChatMessage(
+-      input
+-    );
+-  };
++  const handleSubmit = async (event) => {
++    event.preventDefault();
++    await sendChatMessage(input);
++  };
+@@
+-  const runQuickAction = async (
+-    text
+-  ) => {
+-    if (loading) {
+-      return;
+-    }
+-
+-    await sendChatMessage(
+-      text
+-    );
+-  };
++  const runQuickAction = async (text) => {
++    if (loading) return;
++    await sendChatMessage(text);
++  };
+@@
+-  const openQuickCreate = (
+-    type
+-  ) => {
+-    setQuickCreateType(type);
+-  };
++  const openQuickCreate = (type) => {
++    setQuickCreateType(type);
++  };
+@@
+-  const closeQuickCreate = () => => {
+-    if (loading) {
+-      return;
+-    }
+-
+-    setQuickCreateType(null);
+-  };
++  const closeQuickCreate = () => {
++    if (loading) return;
++    setQuickCreateType(null);
++  };
+@@
+-  const submitQuickCreate = async (
+-    prompt
+-  ) => {
+-    setQuickCreateType(null);
+-
+-    await sendChatMessage(
+-      prompt
+-    );
+-  };
++  const submitQuickCreate = async (prompt) => {
++    setQuickCreateType(null);
++    await sendChatMessage(prompt);
++  };
+
++  const startNewChat = () => {
++    // clear stored messages and reset to welcome
++    window.localStorage.removeItem(CHAT_STORAGE_KEY);
++    setMessages([WELCOME_MESSAGE]);
++    // generate new conversation id
++    const newId = crypto.randomUUID();
++    setConversationId(newId);
++    window.localStorage.setItem(CONVERSATION_ID_KEY, newId);
++  };
+@@
+-      <header className="chat-header">
++      <header className="chat-header">
+@@
+-        <div className="ai-status">
++        <div className="ai-status">
+@@
+-          AI Service
++          AI Service
+@@
+-        </header>
++        </header>
++        {/* New Chat Button */}
++        <button
++          type="button"
++          className="new-chat-button"
++          onClick={startNewChat}
++          disabled={loading}
++        >
++          New chat
++        </button>
+*** End Patch***
+
   try {
     const savedMessages = window.localStorage.getItem(CHAT_STORAGE_KEY);
     if (!savedMessages) {
