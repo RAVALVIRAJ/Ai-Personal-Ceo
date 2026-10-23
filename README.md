@@ -78,6 +78,34 @@ configure the API proxy or set `VITE_BACKEND_URL` and `VITE_AI_SERVICE_URL`.
 The chat transcript is stored in browser local storage and restored when you
 return to the chat or reload the page.
 
+## Deploy the frontend to Vercel
+
+Vercel can build and host the React/Vite frontend. The Spring Boot backend,
+FastAPI AI service, and PostgreSQL database must be deployed separately to
+services that support those runtimes and a persistent database. The frontend
+needs publicly reachable HTTPS URLs for both APIs.
+
+1. Import this repository into Vercel.
+2. Set the Vercel project **Root Directory** to `frontend`.
+3. Keep the detected Vite framework settings, with build command `npm run build`
+   and output directory `dist` (also configured in `frontend/vercel.json`).
+4. Add these environment variables in Vercel for each deployment environment:
+   - `VITE_BACKEND_URL`: base URL of the deployed Spring Boot service, without
+     an `/api/v1` suffix (for example, `https://backend.example.com`).
+   - `VITE_AI_SERVICE_URL`: base URL of the deployed FastAPI service, without
+     an `/api/v1` suffix (for example, `https://ai.example.com`).
+5. Redeploy after setting or changing either variable; Vite embeds them during
+   the build.
+6. Set `CORS_ORIGINS` on both API services to include the exact Vercel frontend
+   origin, such as `https://your-project.vercel.app`. On the backend this
+   configures browser access to `/api/**`; on the AI service it configures
+   FastAPI CORS. Include any Vercel custom domain origins you use.
+
+Deploy and configure the API services before connecting the frontend. The AI
+service also needs `BACKEND_URL` set to the deployed Spring Boot base URL, and
+an available LLM provider configured with its required credentials. Do not use
+localhost URLs for deployed services: they resolve to the visitor's device.
+
 ## Configuration
 
 `.env.example` documents Compose settings. Copy it to `.env` and keep real
