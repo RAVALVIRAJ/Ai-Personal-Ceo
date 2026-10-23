@@ -2503,6 +2503,19 @@ button {
   font-size: 9px;
 }
 
+.service-panel-header .service-mode-badge {
+  margin-top: 0;
+  margin-left: auto;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
 
 /* =========================================================
    OVERALL STATUS

@@ -4,183 +4,56 @@ from pydantic import BaseModel, Field
 
 
 class Intent(str, Enum):
-
-    # =========================================================
-    # TASK INTENTS
-    # =========================================================
-
     CREATE_TASK = "CREATE_TASK"
     UPDATE_TASK = "UPDATE_TASK"
     DELETE_TASK = "DELETE_TASK"
     COMPLETE_TASK = "COMPLETE_TASK"
-
-    # =========================================================
-    # EVENT INTENTS
-    # =========================================================
-
     CREATE_EVENT = "CREATE_EVENT"
     RESCHEDULE_EVENT = "RESCHEDULE_EVENT"
     DELETE_EVENT = "DELETE_EVENT"
-
-    # =========================================================
-    # SCHEDULE / PLANNING
-    # =========================================================
-
     TODAY_SCHEDULE = "TODAY_SCHEDULE"
     TOMORROW_SCHEDULE = "TOMORROW_SCHEDULE"
     WEEKLY_SCHEDULE = "WEEKLY_SCHEDULE"
     DAILY_PLANNING = "DAILY_PLANNING"
-
-    # =========================================================
-    # CHAT
-    # =========================================================
-
     GENERAL_CHAT = "GENERAL_CHAT"
     UNKNOWN = "UNKNOWN"
 
 
-# =============================================================
-# CHAT REQUEST
-# =============================================================
-
 class ChatRequest(BaseModel):
-    """Payload for a chat request.
-
-    * ``message`` – the user message.
-    * ``conversation_id`` – optional identifier for multi‑turn state.
-    * ``provider`` – optional LLM provider name (``ollama`` or ``openai``).
-    """
-    message: str = Field(
-        ...,
-        min_length=1,
-        max_length=5000,
-    )
+    message: str = Field(..., min_length=1, max_length=5000)
     conversation_id: str | None = Field(
         default=None,
-        description="Optional client conversation identifier to track multi‑turn state",
+        description="Optional client conversation identifier for multi-turn state",
     )
     provider: str | None = Field(
         default=None,
-        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
+        description="Optional LLM provider identifier",
     )
 
-    message: str = Field(
-        ...,
-        min_length=1,
-        max_length=5000,
-    )
-    conversation_id: str | None = Field(
-        default=None,
-        description="Optional client conversation identifier to track multi-turn state",
-    )
-    provider: str | None = Field(
-        default=None,
-        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
-    )
-
-    message: str = Field(
-        ...,
-        min_length=1,
-        max_length=5000,
-    )
-
-    conversation_id: str | None = Field(
-        default=None,
-        description="Optional client conversation identifier to track multi-turn state",
-    )
-
-    provider: str | None = Field(
-        default=None,
-        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
-    )
-
-
-    message: str = Field(
-        ...,
-        min_length=1,
-        max_length=5000,
-    )
-
-    conversation_id: str | None = Field(
-        default=None,
-        description="Optional client conversation identifier to track multi-turn state",
-    )
-
-    provider: str | None = Field(
-        default=None,
-        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
-    )
-
-    message: str = Field(
-        ...,
-        min_length=1,
-        max_length=5000,
-    )
-
-    provider: str | None = Field(
-        default=None,
-        description="Optional LLM provider identifier (e.g., 'ollama' or 'openai') to use for this request",
-    )
-        default=None,
-        description="Optional client conversation identifier to track multi-turn state",
-    )
-
-
-# =============================================================
-# TASK DATA
-# =============================================================
 
 class TaskData(BaseModel):
-
     task_id: int | None = None
-
     title: str | None = None
-
     date: str | None = None
-
     time: str | None = None
+    duration_minutes: int | None = Field(default=None, ge=1, le=1440)
 
-    duration_minutes: int | None = Field(
-        default=None,
-        ge=1,
-        le=1440,
-    )
-
-
-# =============================================================
-# EVENT DATA
-# =============================================================
 
 class EventData(BaseModel):
-
     event_id: int | None = None
-
     title: str | None = None
-
     date: str | None = None
-
     start_time: str | None = None
-
     end_time: str | None = None
 
 
-# =============================================================
-# CHAT RESPONSE
-# =============================================================
-
 class ChatResponse(BaseModel):
-
     intent: Intent
-
-    confidence: float = Field(
-        ge=0.0,
-        le=1.0,
-    )
-
+    confidence: float = Field(ge=0.0, le=1.0)
     message: str
-
     task: TaskData | None = None
-
     event: EventData | None = None
-
     task_id: int | None = None
+    event_id: int | None = None
+    missing_fields: list[str] = Field(default_factory=list)
+    conversation_id: str | None = None
