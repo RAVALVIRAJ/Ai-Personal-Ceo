@@ -6,6 +6,7 @@ import { sendMessage } from "../services/aiApi";
 
 const CHAT_STORAGE_KEY = "ai-personal-ceo-chat-messages";
 const CONVERSATION_ID_KEY = "ai-personal-ceo-conversation-id";
+const MAX_SAVED_MESSAGES = 100;
 
 const WELCOME_MESSAGE = {
   id: "welcome",
@@ -37,7 +38,7 @@ function loadChatMessages() {
           typeof message.content === "string"
       )
     ) {
-      return parsedMessages;
+      return parsedMessages.slice(-MAX_SAVED_MESSAGES);
     }
   } catch (error) {
     console.warn("Unable to restore saved chat history.", error);
@@ -46,12 +47,21 @@ function loadChatMessages() {
   return [WELCOME_MESSAGE];
 }
 
+function createConversationId() {
+  return window.crypto.randomUUID();
+}
+
 function loadConversationId() {
-  const stored = window.localStorage.getItem(CONVERSATION_ID_KEY);
-  if (stored) return stored;
-  const newId = crypto.randomUUID();
-  window.localStorage.setItem(CONVERSATION_ID_KEY, newId);
-  return newId;
+  try {
+    const stored = window.localStorage.getItem(CONVERSATION_ID_KEY);
+    if (stored) {
+      return stored;
+    }
+  } catch (error) {
+    console.warn("Unable to restore the saved conversation.", error);
+  }
+
+  return createConversationId();
 }
 
 function ChatPage() {
@@ -65,7 +75,7 @@ function ChatPage() {
     try {
       window.localStorage.setItem(
         CHAT_STORAGE_KEY,
-        JSON.stringify(messages.slice(-100))
+        JSON.stringify(messages.slice(-MAX_SAVED_MESSAGES))
       );
     } catch (error) {
       console.error("Unable to save chat history.", error);
@@ -73,154 +83,103 @@ function ChatPage() {
   }, [messages]);
 
   useEffect(() => {
-    window.localStorage.setItem(CONVERSATION_ID_KEY, conversationId);
+    try {
+      window.localStorage.setItem(CONVERSATION_ID_KEY, conversationId);
+    } catch (error) {
+      console.error("Unable to save the conversation.", error);
+    }
   }, [conversationId]);
-
-  const startNewChat = () => {
-    window.localStorage.removeItem(CHAT_STORAGE_KEY);
-    setMessages([WELCOME_MESSAGE]);
-    const newId = crypto.randomUUID();
-    setConversationId(newId);
-    window.localStorage.setItem(CONVERSATION_ID_KEY, newId);
-  };
-
-  // =========================================================
-  // SEND MESSAGE
-  // =========================================================
 
   const sendChatMessage = async (text) => {
     const trimmedMessage = text.trim();
-
     if (!trimmedMessage || loading) {
       return;
     }
 
     const timestamp = Date.now();
-
-    // -------------------------------------------------------
-    // ADD USER MESSAGE
-    // -------------------------------------------------------
-
-    const userMessage = {
-      id: `${timestamp}-user`,
-      role: "user",
-      content: trimmedMessage,
-      intent: null,
-      task: null,
-      event: null,
-    };
-
-    setMessages((currentMessages) => [...currentMessages, userMessage]);
+    setMessages((currentMessages) => [
+      ...currentMessages,
+      {
+        id: `${timestamp}-user`,
+        role: "user",
+        content: trimmedMessage,
+        intent: null,
+        task: null,
+        event: null,
+      },
+    ]);
     setInput("");
     setLoading(true);
 
     try {
-      // -----------------------------------------------------
-      // FASTAPI
-      // -----------------------------------------------------
       const response = await sendMessage(trimmedMessage, conversationId);
-
-      const aiMessage = {
-        id: `${Date.now()}-assistant`,
-        role: "assistant",
-        content: response.message,
-        intent: response.intent || null,
-        task: response.task || null,
-        event: response.event || null,
-      };
-
-      setMessages((currentMessages) => [...currentMessages, aiMessage]);
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          id: `${Date.now()}-assistant`,
+          role: "assistant",
+          content: response.message,
+          intent: response.intent || null,
+          task: response.task || null,
+          event: response.event || null,
+        },
+      ]);
     } catch (error) {
-      const errorMessage = {
-        id: `${Date.now()}-error`,
-        role: "assistant",
-        content:
-          "I couldn't connect to the AI service.\n\n" +
-          (error.message || "Please make sure FastAPI is running."),
-        intent: null,
-        task: null,
-        event: null,
-      };
-
-      setMessages((currentMessages) => [...currentMessages, errorMessage]);
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          id: `${Date.now()}-error`,
+          role: "assistant",
+          content:
+            "I couldn't connect to the AI service.\n\n" +
+            (error.message || "Please make sure the AI service is running."),
+          intent: null,
+          task: null,
+          event: null,
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   };
-
-  // =========================================================
-  // NORMAL INPUT SUBMIT
-  // =========================================================
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     await sendChatMessage(input);
   };
 
-  // =========================================================
-  // DIRECT QUICK ACTION
-  // =========================================================
-
   const runQuickAction = async (text) => {
-    if (loading) {
-      return;
+    if (!loading) {
+      await sendChatMessage(text);
     }
-    await sendChatMessage(text);
   };
 
-  // =========================================================
-  // QUICK CREATE
-  // =========================================================
-
-  const openQuickCreate = (type) => {
-    setQuickCreateType(type);
-  };
-
-  const closeQuickCreate = () => {
-    if (loading) {
-      return;
-    }
-    setQuickCreateType(null);
-  };
-
-  const submitQuickCreate = async (prompt) => {
-    setQuickCreateType(null);
-    await sendChatMessage(prompt);
+  const startNewChat = () => {
+    setMessages([WELCOME_MESSAGE]);
+    setConversationId(createConversationId());
   };
 
   return (
     <main className="chat-page">
-      {/* =====================================================
-          HEADER
-          ===================================================== */}
       <header className="chat-header">
         <div>
           <h2>AI Personal Manager</h2>
-          <p>
-            Manage your tasks and schedule using natural language.
-          </p>
+          <p>Manage your tasks and schedule using natural language.</p>
         </div>
-
-        <div className="chat-header-actions">
-          <button
-            type="button"
-            className="new-chat-button"
-            onClick={startNewChat}
-            disabled={loading}
-          >
-            + New Chat
-          </button>
-
-          <div className="ai-status">
-            <span className="online-indicator"></span>
-            AI Service
-          </div>
+        <div className="ai-status">
+          <span className="online-indicator" />
+          AI Service
         </div>
+        <button
+          type="button"
+          className="cancel-button"
+          onClick={startNewChat}
+          disabled={loading}
+        >
+          New chat
+        </button>
       </header>
 
-      {/* =====================================================
-          MESSAGES
-          ===================================================== */}
       <section className="chat-content">
         <div className="messages-container">
           {messages.map((item) => (
@@ -234,15 +193,14 @@ function ChatPage() {
             />
           ))}
 
-          {/* TYPING INDICATOR */}
           {loading && (
             <div className="message-row message-row-ai">
               <div className="message-bubble ai-message">
                 <div className="message-label">AI Personal Manager</div>
                 <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+                  <span />
+                  <span />
+                  <span />
                 </div>
               </div>
             </div>
@@ -250,9 +208,6 @@ function ChatPage() {
         </div>
       </section>
 
-      {/* =====================================================
-          QUICK ACTIONS
-          ===================================================== */}
       <section className="suggestions">
         <button
           type="button"
@@ -261,7 +216,6 @@ function ChatPage() {
         >
           ✦ Plan my day
         </button>
-
         <button
           type="button"
           disabled={loading}
@@ -269,27 +223,22 @@ function ChatPage() {
         >
           ◷ Tomorrow
         </button>
-
         <button
           type="button"
           disabled={loading}
-          onClick={() => openQuickCreate("task")}
+          onClick={() => setQuickCreateType("task")}
         >
           + New task
         </button>
-
         <button
           type="button"
           disabled={loading}
-          onClick={() => openQuickCreate("event")}
+          onClick={() => setQuickCreateType("event")}
         >
           + New event
         </button>
       </section>
 
-      {/* =====================================================
-          INPUT
-          ===================================================== */}
       <form className="chat-input-container" onSubmit={handleSubmit}>
         <input
           type="text"
@@ -298,24 +247,24 @@ function ChatPage() {
           onChange={(event) => setInput(event.target.value)}
           disabled={loading}
         />
-
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-        >
+        <button type="submit" disabled={loading || !input.trim()}>
           {loading ? "Thinking..." : "Send"}
         </button>
       </form>
 
-      {/* =====================================================
-          QUICK CREATE MODAL
-          ===================================================== */}
       <QuickCreateModal
         open={quickCreateType !== null}
         type={quickCreateType}
         loading={loading}
-        onClose={closeQuickCreate}
-        onSubmit={submitQuickCreate}
+        onClose={() => {
+          if (!loading) {
+            setQuickCreateType(null);
+          }
+        }}
+        onSubmit={async (prompt) => {
+          setQuickCreateType(null);
+          await sendChatMessage(prompt);
+        }}
       />
     </main>
   );

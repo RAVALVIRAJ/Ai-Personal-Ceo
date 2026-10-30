@@ -1,15 +1,21 @@
 from fastapi import APIRouter
+
 from app.core.config import settings
 
-router = APIRouter()
+
+router = APIRouter(prefix="/api/v1/llm", tags=["LLM"])
 
 
-@router.get("/api/v1/llm/options")
-def get_options():
-    """Return the list of available LLM providers based on environment config."""
-    providers = []
-    if settings.app_mode == "local":
+@router.get("/options")
+async def get_llm_options() -> dict[str, object]:
+    providers: list[str] = []
+
+    if settings.app_mode.lower() == "local":
         providers.append("ollama")
-    if settings.openai_api_key:
+    if settings.openai_api_key.strip():
         providers.append("openai")
-    return {"providers": providers}
+
+    return {
+        "providers": providers,
+        "default": settings.llm_provider,
+    }

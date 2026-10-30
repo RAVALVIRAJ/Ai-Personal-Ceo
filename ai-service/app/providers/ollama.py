@@ -1,5 +1,6 @@
 import httpx
 
+from app.core.config import settings
 from app.providers.base import LLMProvider
 
 
@@ -40,6 +41,9 @@ class OllamaProvider(LLMProvider):
     ):
         self.model = model
         self.base_url = base_url
+        self.timeout = settings.llm_timeout_seconds
+        self.num_ctx = settings.ollama_num_ctx
+        self.keep_alive = settings.ollama_keep_alive
 
     async def generate(self, prompt: str) -> str:
 
@@ -56,9 +60,11 @@ Assistant:
             "model": self.model,
             "prompt": full_prompt,
             "stream": False,
+            "keep_alive": self.keep_alive,
+            "options": {"num_ctx": self.num_ctx},
         }
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
 
             response = await client.post(
                 f"{self.base_url}/api/generate",
@@ -81,12 +87,14 @@ Assistant:
             "messages": messages,
             "stream": False,
             "format": schema,
+            "keep_alive": self.keep_alive,
             "options": {
                 "temperature": 0.1,
+                "num_ctx": self.num_ctx,
             },
         }
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 f"{self.base_url}/api/chat",
                 json=payload,

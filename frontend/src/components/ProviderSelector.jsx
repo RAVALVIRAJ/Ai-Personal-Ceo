@@ -1,47 +1,28 @@
+// ProviderSelector.jsx – shows a dropdown of available LLM providers and persists the choice in localStorage.
 import { useEffect, useState } from "react";
 import { getOptions } from "../services/aiApi";
 
-const PROVIDER_LABELS = {
-  ollama: "Ollama (Local)",
-  openai: "Cloud (Groq/OpenAI)",
-  mock: "Mock",
-};
-
 const ProviderSelector = () => {
   const [providers, setProviders] = useState([]);
-  const [selected, setSelected] = useState(
-    () => localStorage.getItem("selectedProvider") || ""
-  );
+  const [selected, setSelected] = useState(() => localStorage.getItem("selectedProvider") || "");
 
+  // Fetch available providers on mount
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchOptions = async () => {
+    const fetch = async () => {
       try {
         const data = await getOptions();
-        if (!isMounted) return;
         const list = data.providers || [];
         setProviders(list);
-
-        const current = localStorage.getItem("selectedProvider");
-        if (list.length > 0) {
-          if (!current || !list.includes(current)) {
-            setSelected(list[0]);
-            localStorage.setItem("selectedProvider", list[0]);
-          } else {
-            setSelected(current);
-          }
+        if (!selected && list.length) {
+          const defaultProv = list[0];
+          setSelected(defaultProv);
+          localStorage.setItem("selectedProvider", defaultProv);
         }
       } catch (e) {
         console.error("Failed to fetch LLM options", e);
       }
     };
-
-    fetchOptions();
-
-    return () => {
-      isMounted = false;
-    };
+    fetch();
   }, []);
 
   const handleChange = (e) => {
@@ -50,21 +31,15 @@ const ProviderSelector = () => {
     localStorage.setItem("selectedProvider", value);
   };
 
-  // Only render when 2 or more providers are available
   if (providers.length < 2) return null;
 
   return (
-    <div className="provider-selector" title="Select LLM Provider">
-      <label htmlFor="provider-select">Model:</label>
-      <select
-        id="provider-select"
-        value={selected}
-        onChange={handleChange}
-        aria-label="Select LLM Provider"
-      >
+    <div className="provider-selector">
+      <label htmlFor="provider-select">LLM Provider: </label>
+      <select id="provider-select" value={selected} onChange={handleChange}>
         {providers.map((p) => (
           <option key={p} value={p}>
-            {PROVIDER_LABELS[p] || p}
+            {p}
           </option>
         ))}
       </select>

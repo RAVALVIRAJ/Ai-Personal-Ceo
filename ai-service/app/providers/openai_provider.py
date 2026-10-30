@@ -25,6 +25,7 @@ class OpenAIProvider(LLMProvider):
 
         client_kwargs = {
             "api_key": self.api_key or "no-key-provided",
+            "timeout": settings.llm_timeout_seconds,
         }
         if self.base_url and self.base_url.strip():
             client_kwargs["base_url"] = self.base_url.strip()

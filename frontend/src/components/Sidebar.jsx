@@ -29,7 +29,6 @@ const offlineStatus = {
     ollama: {
       online: false,
       model_available: false,
-      model: "llama3.2:3b",
     },
   },
 };
@@ -83,6 +82,8 @@ function Sidebar() {
   ] = useState(true);
 
 
+
+
   const loadStatus = async () => {
     try {
       const data =
@@ -119,11 +120,20 @@ function Sidebar() {
     status.services ||
     offlineStatus.services;
 
+  const llm = status.llm;
+  const llmOnline = llm
+    ? llm.online
+    : services.ollama?.online;
 
   const overallOnline =
     services.ai_service?.online &&
     services.backend?.online &&
-    services.ollama?.online;
+    llmOnline;
+
+  const modelName =
+    llm?.model ||
+    services.ollama?.model ||
+    "-";
 
 
   return (
@@ -271,7 +281,7 @@ function Sidebar() {
                 checking
                   ? "Checking Services..."
                   : overallOnline
-                  ? "Local Services"
+                  ? "Services Online"
                   : "Service Issue"
               }
             </strong>
@@ -281,6 +291,14 @@ function Sidebar() {
             </span>
 
           </div>
+
+          {status.mode && (
+            <span className="service-mode-badge">
+              {status.mode.toLowerCase() === "live"
+                ? "LIVE DEMO"
+                : "LOCAL"}
+            </span>
+          )}
 
         </div>
 
@@ -304,11 +322,8 @@ function Sidebar() {
           />
 
           <StatusItem
-            name="Ollama"
-            online={
-              services.ollama
-                ?.online
-            }
+            name={llm?.label || (llm ? "LLM" : "Ollama")}
+            online={llmOnline}
           />
 
         </div>
@@ -320,32 +335,21 @@ function Sidebar() {
             Model
           </span>
 
-          <strong>
-            {
-              services.ollama
-                ?.model ||
-              "llama3.2:3b"
-            }
-          </strong>
+          <strong>{modelName}</strong>
 
 
-          {services.ollama
-            ?.online && (
+          {(llm ? llm.online : services.ollama?.online) && (
 
             <span
               className={
-                services.ollama
-                  ?.model_available
+                llm || services.ollama?.model_available
                   ? "model-ready"
                   : "model-missing"
               }
             >
-              {
-                services.ollama
-                  ?.model_available
-                  ? "Ready"
-                  : "Not found"
-              }
+              {llm || services.ollama?.model_available
+                ? "Ready"
+                : "Not found"}
             </span>
 
           )}

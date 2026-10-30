@@ -18,6 +18,7 @@ from app.services.backend_client import backend_client
 from app.services.intent_service import intent_service
 from app.services.extraction_service import (
     ExtractionService,
+    get_timezone,
     resolve_date_and_time,
 )
 
@@ -169,7 +170,8 @@ class AIService:
         self,
         request: ChatRequest,
     ) -> ChatResponse:
-
+        message = request.message
+        provider = self.provider
 
         # -----------------------------------------------------
         # 0. PROVIDER OVERRIDE VALIDATION
@@ -179,18 +181,18 @@ class AIService:
         # This must happen before any other intent handling.
         if request.provider:
             usable_providers: list[str] = []
-            if settings.app_mode == "local":
+            if settings.app_mode.lower() == "local":
                 usable_providers.append("ollama")
-            if settings.openai_api_key:
+            if settings.openai_api_key.strip():
                 usable_providers.append("openai")
             if request.provider not in usable_providers:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Provider '{request.provider}' is not configured or unavailable.",
                 )
-            # Switch to the requested provider for this request only.
-            self.provider = get_provider(request.provider)
-            self.extraction_service = ExtractionService(provider=self.provider)
+            provider = get_provider(request.provider)
+
+        extraction_service = ExtractionService(provider=provider)
 
         lower = message.lower()
 
@@ -499,7 +501,7 @@ class AIService:
             tasks = await backend_client.get_tasks()
             events = await backend_client.get_events()
 
-            today = datetime.now().date().isoformat()
+            today = datetime.now(get_timezone()).date().isoformat()
 
             today_tasks = [
                 task
@@ -570,7 +572,7 @@ class AIService:
             events = await backend_client.get_events()
 
             tomorrow = (
-                datetime.now().date()
+                datetime.now(get_timezone()).date()
                 + timedelta(days=1)
             ).isoformat()
 
@@ -642,7 +644,7 @@ class AIService:
             tasks = await backend_client.get_tasks()
             events = await backend_client.get_events()
 
-            today_date = datetime.now().date()
+            today_date = datetime.now(get_timezone()).date()
 
             week_start = (
                 today_date
@@ -733,7 +735,7 @@ class AIService:
             tasks = await backend_client.get_tasks()
             events = await backend_client.get_events()
 
-            today = datetime.now().date().isoformat()
+            today = datetime.now(get_timezone()).date().isoformat()
 
             today_tasks = [
                 task
@@ -977,7 +979,7 @@ class AIService:
         #    RESCHEDULE_EVENT
         # -----------------------------------------------------
 
-        extracted = await self.extraction_service.extract(message)
+        extracted = await extraction_service.extract(message)
 
         if extracted is not None and extracted.intent:
             extracted_intent = extracted.intent.upper()
@@ -1183,7 +1185,7 @@ class AIService:
             # GENERAL CHAT via LLM
             # -------------------------------------------------
             if extracted_intent == Intent.GENERAL_CHAT.value:
-                llm_response = await self.provider.generate(message)
+                llm_response = await provider.generate(message)
                 return ChatResponse(
                     intent=Intent.GENERAL_CHAT,
                     confidence=0.85,
@@ -1367,7 +1369,7 @@ class AIService:
 
         if result.intent == Intent.GENERAL_CHAT:
 
-            llm_response = await self.provider.generate(
+            llm_response = await provider.generate(
                 message
             )
 
@@ -1400,7 +1402,7 @@ class AIService:
         Respond concisely.
         """
 
-        llm_response = await self.provider.generate(
+        llm_response = await provider.generate(
             safe_prompt
         )
 
