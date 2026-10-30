@@ -2,12 +2,10 @@ import { useEffect, useState } from "react";
 
 import ChatMessage from "../components/ChatMessage";
 import QuickCreateModal from "../components/QuickCreateModal";
-
-import {
-  sendMessage,
-} from "../services/aiApi";
+import { sendMessage } from "../services/aiApi";
 
 const CHAT_STORAGE_KEY = "ai-personal-ceo-chat-messages";
+const CONVERSATION_ID_KEY = "ai-personal-ceo-conversation-id";
 
 const WELCOME_MESSAGE = {
   id: "welcome",
@@ -48,462 +46,279 @@ function loadChatMessages() {
   return [WELCOME_MESSAGE];
 }
 
+function loadConversationId() {
+  const stored = window.localStorage.getItem(CONVERSATION_ID_KEY);
+  if (stored) return stored;
+  const newId = crypto.randomUUID();
+  window.localStorage.setItem(CONVERSATION_ID_KEY, newId);
+  return newId;
+}
+
 function ChatPage() {
-  const [input, setInput] =
-    useState("");
-
-  const [messages, setMessages] =
-    useState(loadChatMessages);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [
-    quickCreateType,
-    setQuickCreateType,
-  ] = useState(null);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState(loadChatMessages);
+  const [loading, setLoading] = useState(false);
+  const [quickCreateType, setQuickCreateType] = useState(null);
+  const [conversationId, setConversationId] = useState(loadConversationId);
 
   useEffect(() => {
     try {
       window.localStorage.setItem(
         CHAT_STORAGE_KEY,
-        JSON.stringify(messages)
+        JSON.stringify(messages.slice(-100))
       );
     } catch (error) {
       console.error("Unable to save chat history.", error);
     }
   }, [messages]);
 
+  useEffect(() => {
+    window.localStorage.setItem(CONVERSATION_ID_KEY, conversationId);
+  }, [conversationId]);
+
+  const startNewChat = () => {
+    window.localStorage.removeItem(CHAT_STORAGE_KEY);
+    setMessages([WELCOME_MESSAGE]);
+    const newId = crypto.randomUUID();
+    setConversationId(newId);
+    window.localStorage.setItem(CONVERSATION_ID_KEY, newId);
+  };
 
   // =========================================================
   // SEND MESSAGE
   // =========================================================
 
-  const sendChatMessage = async (
-    text
-  ) => {
-    const trimmedMessage =
-      text.trim();
+  const sendChatMessage = async (text) => {
+    const trimmedMessage = text.trim();
 
-    if (
-      !trimmedMessage ||
-      loading
-    ) {
+    if (!trimmedMessage || loading) {
       return;
     }
 
-
-    const timestamp =
-      Date.now();
-
+    const timestamp = Date.now();
 
     // -------------------------------------------------------
     // ADD USER MESSAGE
     // -------------------------------------------------------
 
     const userMessage = {
-      id:
-        `${timestamp}-user`,
-
+      id: `${timestamp}-user`,
       role: "user",
-
-      content:
-        trimmedMessage,
-
+      content: trimmedMessage,
       intent: null,
       task: null,
       event: null,
     };
 
-
-    setMessages(
-      (currentMessages) => [
-        ...currentMessages,
-        userMessage,
-      ]
-    );
-
-
+    setMessages((currentMessages) => [...currentMessages, userMessage]);
     setInput("");
     setLoading(true);
 
-
     try {
-
       // -----------------------------------------------------
       // FASTAPI
       // -----------------------------------------------------
-
-      const response =
-        await sendMessage(
-          trimmedMessage
-        );
-
+      const response = await sendMessage(trimmedMessage, conversationId);
 
       const aiMessage = {
-        id:
-          `${Date.now()}-assistant`,
-
+        id: `${Date.now()}-assistant`,
         role: "assistant",
-
-        content:
-          response.message,
-
-        intent:
-          response.intent || null,
-
-        task:
-          response.task || null,
-
-        event:
-          response.event || null,
+        content: response.message,
+        intent: response.intent || null,
+        task: response.task || null,
+        event: response.event || null,
       };
 
-
-      setMessages(
-        (currentMessages) => [
-          ...currentMessages,
-          aiMessage,
-        ]
-      );
-
+      setMessages((currentMessages) => [...currentMessages, aiMessage]);
     } catch (error) {
-
       const errorMessage = {
-        id:
-          `${Date.now()}-error`,
-
+        id: `${Date.now()}-error`,
         role: "assistant",
-
         content:
           "I couldn't connect to the AI service.\n\n" +
-          (
-            error.message ||
-            "Please make sure FastAPI is running."
-          ),
-
+          (error.message || "Please make sure FastAPI is running."),
         intent: null,
         task: null,
         event: null,
       };
 
-
-      setMessages(
-        (currentMessages) => [
-          ...currentMessages,
-          errorMessage,
-        ]
-      );
-
+      setMessages((currentMessages) => [...currentMessages, errorMessage]);
     } finally {
-
       setLoading(false);
     }
   };
-
 
   // =========================================================
   // NORMAL INPUT SUBMIT
   // =========================================================
 
-  const handleSubmit = async (
-    event
-  ) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-
-    await sendChatMessage(
-      input
-    );
+    await sendChatMessage(input);
   };
-
 
   // =========================================================
   // DIRECT QUICK ACTION
   // =========================================================
 
-  const runQuickAction = async (
-    text
-  ) => {
+  const runQuickAction = async (text) => {
     if (loading) {
       return;
     }
-
-    await sendChatMessage(
-      text
-    );
+    await sendChatMessage(text);
   };
-
 
   // =========================================================
   // QUICK CREATE
   // =========================================================
 
-  const openQuickCreate = (
-    type
-  ) => {
+  const openQuickCreate = (type) => {
     setQuickCreateType(type);
   };
-
 
   const closeQuickCreate = () => {
     if (loading) {
       return;
     }
-
     setQuickCreateType(null);
   };
 
-
-  const submitQuickCreate = async (
-    prompt
-  ) => {
+  const submitQuickCreate = async (prompt) => {
     setQuickCreateType(null);
-
-    await sendChatMessage(
-      prompt
-    );
+    await sendChatMessage(prompt);
   };
-
 
   return (
     <main className="chat-page">
-
       {/* =====================================================
           HEADER
           ===================================================== */}
-
       <header className="chat-header">
-
         <div>
-
-          <h2>
-            AI Personal Manager
-          </h2>
-
+          <h2>AI Personal Manager</h2>
           <p>
-            Manage your tasks and schedule
-            using natural language.
+            Manage your tasks and schedule using natural language.
           </p>
-
         </div>
 
+        <div className="chat-header-actions">
+          <button
+            type="button"
+            className="new-chat-button"
+            onClick={startNewChat}
+            disabled={loading}
+          >
+            + New Chat
+          </button>
 
-        <div className="ai-status">
-
-          <span className="online-indicator">
-          </span>
-
-          AI Service
-
+          <div className="ai-status">
+            <span className="online-indicator"></span>
+            AI Service
+          </div>
         </div>
-
       </header>
-
 
       {/* =====================================================
           MESSAGES
           ===================================================== */}
-
       <section className="chat-content">
-
         <div className="messages-container">
-
-          {messages.map(
-            (item) => (
-
-              <ChatMessage
-                key={item.id}
-
-                role={
-                  item.role
-                }
-
-                content={
-                  item.content
-                }
-
-                intent={
-                  item.intent
-                }
-
-                task={
-                  item.task
-                }
-
-                event={
-                  item.event
-                }
-              />
-
-            )
-          )}
-
+          {messages.map((item) => (
+            <ChatMessage
+              key={item.id}
+              role={item.role}
+              content={item.content}
+              intent={item.intent}
+              task={item.task}
+              event={item.event}
+            />
+          ))}
 
           {/* TYPING INDICATOR */}
-
           {loading && (
-
             <div className="message-row message-row-ai">
-
               <div className="message-bubble ai-message">
-
-                <div className="message-label">
-                  AI Personal Manager
-                </div>
-
-
+                <div className="message-label">AI Personal Manager</div>
                 <div className="typing-indicator">
-
                   <span></span>
                   <span></span>
                   <span></span>
-
                 </div>
-
               </div>
-
             </div>
-
           )}
-
         </div>
-
       </section>
-
 
       {/* =====================================================
           QUICK ACTIONS
           ===================================================== */}
-
       <section className="suggestions">
-
         <button
           type="button"
           disabled={loading}
-          onClick={() =>
-            runQuickAction(
-              "What should I focus on today?"
-            )
-          }
+          onClick={() => runQuickAction("What should I focus on today?")}
         >
           ✦ Plan my day
         </button>
 
-
         <button
           type="button"
           disabled={loading}
-          onClick={() =>
-            runQuickAction(
-              "What do I have tomorrow?"
-            )
-          }
+          onClick={() => runQuickAction("What do I have tomorrow?")}
         >
           ◷ Tomorrow
         </button>
 
-
         <button
           type="button"
           disabled={loading}
-          onClick={() =>
-            openQuickCreate(
-              "task"
-            )
-          }
+          onClick={() => openQuickCreate("task")}
         >
           + New task
         </button>
 
-
         <button
           type="button"
           disabled={loading}
-          onClick={() =>
-            openQuickCreate(
-              "event"
-            )
-          }
+          onClick={() => openQuickCreate("event")}
         >
           + New event
         </button>
-
       </section>
-
 
       {/* =====================================================
           INPUT
           ===================================================== */}
-
-      <form
-        className="chat-input-container"
-        onSubmit={
-          handleSubmit
-        }
-      >
-
+      <form className="chat-input-container" onSubmit={handleSubmit}>
         <input
           type="text"
-
-          placeholder=
-            "Ask your AI Personal Manager..."
-
+          placeholder="Ask your AI Personal Manager..."
           value={input}
-
-          onChange={
-            (event) =>
-              setInput(
-                event.target.value
-              )
-          }
-
+          onChange={(event) => setInput(event.target.value)}
           disabled={loading}
         />
 
-
         <button
           type="submit"
-
-          disabled={
-            loading ||
-            !input.trim()
-          }
+          disabled={loading || !input.trim()}
         >
-          {loading
-            ? "Thinking..."
-            : "Send"}
+          {loading ? "Thinking..." : "Send"}
         </button>
-
       </form>
-
 
       {/* =====================================================
           QUICK CREATE MODAL
           ===================================================== */}
-
       <QuickCreateModal
-        open={
-          quickCreateType !== null
-        }
-
-        type={
-          quickCreateType
-        }
-
+        open={quickCreateType !== null}
+        type={quickCreateType}
         loading={loading}
-
-        onClose={
-          closeQuickCreate
-        }
-
-        onSubmit={
-          submitQuickCreate
-        }
+        onClose={closeQuickCreate}
+        onSubmit={submitQuickCreate}
       />
-
     </main>
   );
 }
-
 
 export default ChatPage;

@@ -4,66 +4,82 @@ Chat-based personal assistant. The user types natural language ("remind me to
 submit the report next Friday at 5pm"); the system turns it into tasks and
 events stored in PostgreSQL and shown in a React dashboard.
 
+## ONE codebase, TWO run modes
+
+The same code runs in two modes. The UI must look and behave the same in both.
+Only configuration (environment variables) differs. Never fork the code.
+
+| | LIVE mode (website) | LOCAL mode (laptop) |
+|---|---|---|
+| Frontend | Vercel (static build) | nginx container, or `npm run dev` |
+| Backend | Render (Docker) | Docker Compose, or `mvnw spring-boot:run` |
+| AI service | Render (Docker) | Docker Compose, or `uvicorn` |
+| Database | Neon Postgres | Postgres container, or local Postgres |
+| LLM | Groq (`LLM_PROVIDER=openai`, OpenAI-compatible) | Ollama on the host (`LLM_PROVIDER=ollama`) |
+| API URLs | `VITE_BACKEND_URL`, `VITE_AI_SERVICE_URL` = Render hosts | empty (relative URLs, same origin via nginx/Vite proxy) |
+| Hosting quirks | Free instances sleep (about 1 min cold start), 512 MB RAM, UTC clock | Always on, no internet needed |
+
+`APP_MODE=live|local` (AI service env) is only a label shown in the UI. It must
+never change behavior.
+
 ## Architecture (3 services)
 
 | Service | Path | Tech | Port |
 |---|---|---|---|
-| Frontend | `frontend/` | React + Vite, plain CSS | 5173 |
-| Backend | `backend/` | Spring Boot (Java), Spring Data JPA, PostgreSQL | 8080 |
+| Frontend | `frontend/` | React + Vite | 5173 (dev) / 80 (nginx) |
+| Backend | `backend/` | Spring Boot (Java), JPA, PostgreSQL | 8080 |
 | AI service | `ai-service/` | Python FastAPI, httpx, pydantic v2 | 8000 |
 
-Flow: React -> `POST /api/v1/ai/chat` (AI service) -> AI service calls the
-backend REST API (`app/services/backend_client.py`) to create/update/list
-tasks and events -> reply goes back to React.
+Flow: React -> `POST {AI}/api/v1/ai/chat` -> AI service extracts intent with
+the LLM (and regex for explicit ID commands) -> calls the backend REST API ->
+reply returns to React. React also calls the backend directly for the
+Tasks, Events, Schedule and Dashboard pages.
 
 ## Key files
 
-- `ai-service/app/services/ai_service.py`: main message router (`process_message`).
-- `ai-service/app/services/intent_service.py`: CURRENT intent/date/time/title
-  extraction. It is regex-based, and `extract_date` only knows
-  today / tomorrow / day after tomorrow.
-- `ai-service/app/providers/`: `base.py` (LLMProvider), `ollama.py`,
-  `openai_provider.py`, `mock.py`. The provider is currently hard-coded at the
-  bottom of `ai_service.py` (Ollama, `llama3.2:3b`).
-- `ai-service/app/schemas/chat.py`: `Intent` enum, `ChatRequest`,
-  `TaskData`, `EventData`, `ChatResponse`.
-- `ai-service/app/core/config.py`: pydantic-settings, reads `.env`.
+- `ai-service/app/services/ai_service.py`: message router (`process_message`).
+- `ai-service/app/services/extraction_service.py`: LLM JSON extraction.
+- `ai-service/app/services/intent_service.py`: regex intent/date/time rules.
+- `ai-service/app/services/conversation_service.py`: multi-turn state
+  (`conversation_id`) for missing-field follow-ups.
+- `ai-service/app/providers/`: `ollama.py`, `openai_provider.py`, `mock.py`,
+  and the `get_provider()` factory in `__init__.py`.
+- `ai-service/app/routers/status.py`: `GET /api/v1/status/services`.
+- `ai-service/app/core/config.py`: pydantic-settings, reads env / `.env`.
 - Backend REST: `/api/v1/tasks` (CRUD, `/{id}/complete`, `/today`,
-  `/tomorrow`, `/week`) and `/api/v1/events` (CRUD).
-- Entities: `Task(title, description, dueDate, dueTime, durationMinutes,
-  status)` and `Event(title, description, eventDate, startTime, endTime)`.
-- Frontend chat: `frontend/src/pages/ChatPage.jsx`, `services/aiApi.js`.
+  `/tomorrow`, `/week`) and `/api/v1/events`.
+- Backend reminders: `TaskReminderScheduler` (every minute, Asia/Kolkata),
+  `TaskReminderService` (email via Spring Mail), `Task.reminderBeforeMinutes`
+  and `Task.notified`.
+- Frontend: `src/pages/ChatPage.jsx`, `src/services/*Api.js`,
+  `src/services/apiConfig.js`, `src/components/Sidebar.jsx` (status panel).
+- Deployment files: `docker-compose.yml`, `frontend/vercel.json`,
+  `frontend/nginx.conf`, `*/Dockerfile`, `.env.example`.
 
-## Conventions and rules
+## Rules (apply in BOTH modes)
 
-- Timezone is Asia/Kolkata. Never use `date.today()` or naive datetimes;
-  use `datetime.now(ZoneInfo("Asia/Kolkata"))`.
+- Timezone is Asia/Kolkata everywhere, including on hosts whose clock is UTC.
+  Never use `LocalDate.now()`, `LocalDateTime.now()` or `date.today()` without
+  an explicit zone.
 - Never guess missing information. Ask a follow-up question instead.
 - Do not claim an action succeeded unless the backend call succeeded.
-- LLM output is untrusted. Validate it with pydantic before using it.
-- Keep the LLM provider configurable through `.env` / `config.py`
-  (`LLM_PROVIDER=ollama|openai|mock`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`).
-  No hard-coded URLs or model names.
+- LLM output is untrusted. Validate it before using it. If the LLM fails,
+  return a polite message, never a raw 500.
+- No hard-coded URLs, model names, ports or credentials. Everything comes from
+  environment variables with safe local defaults.
+- Never commit secrets. Only `*.example` env files go in Git.
 - Existing explicit commands (`complete task 17`, `delete event 5`) must keep
-  working exactly as they do now.
-- Do not change the database schema without telling me first.
-  `ddl-auto=update` is on, so entity edits alter tables.
-- Never commit secrets. `.env` and `application.properties` credentials should
-  come from environment variables.
+  working.
+- Do not change the database schema without telling me first
+  (`ddl-auto=update` is on).
 - Make small, reviewable changes. Before editing, show a plan listing the
   files you will touch. After editing, list changed files and how to test.
 - Do not rewrite working code or reformat unrelated files.
 
 ## How to run
 
-- AI service: `cd ai-service && uvicorn app.main:app --reload --port 8000`
-- Backend: `cd backend && ./mvnw spring-boot:run`
-- Frontend: `cd frontend && npm install && npm run dev`
-- Ollama must be running locally (`ollama serve`) with the model pulled.
-
-## Known gaps (not bugs to silently "fix")
-
-- No recurrence, no reminder offsets, no alert firing yet.
-- `README.md`, `docker-compose.yml`, `routes/scheduling.py`,
-  `routes/suggestions.py` and `clients/backend_client.py` are empty files.
-- `ChatRequest` only has `message`; there is no conversation state yet.
+- LOCAL (Docker): `docker compose --env-file .env.local up --build`, with
+  Ollama running on the host (`ollama serve`).
+- LOCAL (dev): three terminals, one each for `ai-service` (`uvicorn`),
+  `backend` (`./mvnw spring-boot:run`) and `frontend` (`npm run dev`).
+- LIVE: see `docs/DEPLOY_LIVE.md`.

@@ -11,6 +11,8 @@ import {
   getServiceStatus,
 } from "../services/statusApi";
 
+import ProviderSelector from "./ProviderSelector";
+
 
 const offlineStatus = {
   overall: "OFFLINE",
@@ -150,6 +152,12 @@ function Sidebar() {
         </div>
 
       </div>
+
+      {/* =====================================================
+          LLM PROVIDER SELECTOR
+          ===================================================== */}
+
+      <ProviderSelector />
 
 
       {/* =====================================================

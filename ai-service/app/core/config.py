@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     # Timezone
     timezone: str = "Asia/Kolkata"
 
+    # App mode label (live | local) – does not change behaviour
+    app_mode: str = "local"
+
+    # Optional fallback provider name
+    llm_fallback_provider: str = ""
+    llm_timeout_seconds: int = 60
+    status_timeout_seconds: int = 3
+    rate_limit_per_minute: int = 0  # 0 = disabled
+    ollama_num_ctx: int = 4096
+    ollama_keep_alive: str = "30m"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

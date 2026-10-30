@@ -4,13 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers.status import router as status_router
 from app.api.routes import chat, health
-
+from app.routers import llm_options
 
 app = FastAPI(
     title="AI Personal Manager",
     version="1.0.0",
 )
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,3 +29,4 @@ app.add_middleware(
 app.include_router(status_router)
 app.include_router(health.router)
 app.include_router(chat.router)
+app.include_router(llm_options.router)
