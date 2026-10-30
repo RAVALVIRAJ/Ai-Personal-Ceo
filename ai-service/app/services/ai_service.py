@@ -112,6 +112,20 @@ class AIService:
             ),
         )
 
+    def _reminder_minutes(self, requested, resolved_time):
+        """Minutes before the due time to email a reminder.
+
+        A reminder needs a due time, so return None when there is none.
+        Use the user's own lead time when given, otherwise the configured
+        default (DEFAULT_REMINDER_BEFORE_MINUTES, 0 turns it off).
+        """
+        if not resolved_time:
+            return None
+        if requested is not None:
+            return max(0, int(requested))
+        default = settings.default_reminder_before_minutes
+        return default if default > 0 else None
+
     def format_time(self, value):
         if not value:
             return "no time specified"
@@ -1001,6 +1015,10 @@ class AIService:
                     due_date=resolved_date,
                     due_time=resolved_time,
                     duration_minutes=extracted.duration_minutes,
+                    reminder_before_minutes=self._reminder_minutes(
+                        extracted.reminder_before_minutes,
+                        resolved_time,
+                    ),
                 )
 
                 if isinstance(created_task, dict) and created_task.get("error"):
@@ -1215,6 +1233,10 @@ class AIService:
                 due_date=task.date,
                 due_time=task.time,
                 duration_minutes=task.duration_minutes,
+                reminder_before_minutes=self._reminder_minutes(
+                    None,
+                    task.time,
+                ),
             )
 
             created_task_id = None

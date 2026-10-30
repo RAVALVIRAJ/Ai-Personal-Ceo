@@ -5,6 +5,7 @@ import com.aipersonalceo.backend.entity.TaskStatus;
 import com.aipersonalceo.backend.repository.TaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -21,17 +22,26 @@ public class TaskReminderScheduler {
 
     private final TaskRepository taskRepository;
     private final TaskReminderService reminderService;
+    private final boolean enabled;
+    private final long maxLateMinutes;
 
     public TaskReminderScheduler(
             TaskRepository taskRepository,
-            TaskReminderService reminderService
+            TaskReminderService reminderService,
+            @Value("${app.reminders.enabled:true}") boolean enabled,
+            @Value("${app.reminders.max-late-minutes:1440}") long maxLateMinutes
     ) {
         this.taskRepository = taskRepository;
         this.reminderService = reminderService;
+        this.enabled = enabled;
+        this.maxLateMinutes = maxLateMinutes;
     }
 
     @Scheduled(cron = "0 * * * * *", zone = "Asia/Kolkata")
     public void sendDueReminders() {
+        if (!enabled) {
+            return;
+        }
         LocalDateTime now = LocalDateTime.now(TIME_ZONE);
         List<Task> candidates = taskRepository.findReminderCandidates(
                 List.of(TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
@@ -43,6 +53,15 @@ public class TaskReminderScheduler {
                     task.getDueTime()
             ).minusMinutes(task.getReminderBeforeMinutes());
             if (reminderAt.isAfter(now)) {
+                continue;
+            }
+            // Do not email about tasks that were due long ago (for example
+            // old rows when reminders are first switched on).
+            LocalDateTime dueAt = LocalDateTime.of(
+                    task.getDueDate(),
+                    task.getDueTime()
+            );
+            if (dueAt.plusMinutes(maxLateMinutes).isBefore(now)) {
                 continue;
             }
 

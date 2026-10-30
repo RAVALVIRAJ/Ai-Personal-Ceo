@@ -18,6 +18,7 @@ class BackendClient:
         due_date: str | None = None,
         due_time: str | None = None,
         duration_minutes: int | None = None,
+        reminder_before_minutes: int | None = None,
     ):
         payload = {
             "title": title,
@@ -25,6 +26,7 @@ class BackendClient:
             "dueDate": due_date,
             "dueTime": due_time,
             "durationMinutes": duration_minutes,
+            "reminderBeforeMinutes": reminder_before_minutes,
         }
 
         async with httpx.AsyncClient(timeout=10.0) as client:

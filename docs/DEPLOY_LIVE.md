@@ -59,14 +59,20 @@ Set these environment variables on the backend service:
 | `APP_TIMEZONE` | `Asia/Kolkata` |
 | `JPA_DDL_AUTO` | `update` (the backend currently uses Hibernate schema update). |
 | `JPA_SHOW_SQL` | `false` |
-| `REMINDERS_ENABLED` | `false` until SMTP has been configured. |
+| `REMINDERS_ENABLED` | `false` until email has been configured, then `true`. |
+| `REMINDER_EMAIL_PROVIDER` | `resend` on Render free (SMTP ports are blocked there). |
+| `RESEND_API_KEY` | Resend API key (**secret**). |
+| `REMINDER_EMAIL_FROM` | `onboarding@resend.dev` while testing without your own domain. |
+| `REMINDER_EMAIL_TO` | The email address you signed up to Resend with (the test sender can only deliver to it). |
 | `MANAGEMENT_HEALTH_MAIL_ENABLED` | `false` |
 
-Leave the SMTP variables unset while reminders are disabled. If enabling email
-reminders later, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
-`SMTP_PASSWORD`, `SMTP_AUTH`, `SMTP_STARTTLS_ENABLE`, `REMINDER_EMAIL_FROM`,
-and `REMINDER_EMAIL_TO` in Render. Keep passwords in the dashboard, not in
-repository files.
+Render free web services block outbound SMTP ports 25, 465 and 587, so the live
+backend sends reminders through the Resend HTTPS API
+(`REMINDER_EMAIL_PROVIDER=resend`). Create a free Resend account and API key,
+set the variables above in Render, then set `REMINDERS_ENABLED=true`. For SMTP
+(local mode or a paid Render instance) use `REMINDER_EMAIL_PROVIDER=smtp` with
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_AUTH` and
+`SMTP_STARTTLS_ENABLE`. Keep secrets in the dashboard, not in repository files.
 
 Wait for Render to report the backend as healthy and note its public HTTPS
 origin. Do not include `/api/v1` or a trailing slash when using it as a base

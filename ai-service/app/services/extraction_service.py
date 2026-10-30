@@ -45,6 +45,10 @@ class ExtractedItem(BaseModel):
         default=None,
         description="Priority if mentioned (e.g. HIGH, MEDIUM, LOW)",
     )
+    reminder_before_minutes: int | None = Field(
+        default=None,
+        description="Minutes before the due time to send the reminder, only if the user said so (e.g. 'remind me 30 minutes before' -> 30, '1 hour before' -> 60)",
+    )
     missing_fields: list[str] = Field(
         default_factory=list,
         description="List of strings denoting missing required or expected fields",
@@ -75,7 +79,8 @@ EXTRACTION RULES:
 6. If the intent cannot be determined, set intent to "UNKNOWN".
 7. Extract durations in integer minutes into `duration_minutes` (e.g. "for 2 hours" -> 120, "for 30 mins" -> 30).
 8. If an actionable request is missing an expected field (such as time for a specific task/meeting, or a title), list that field name in `missing_fields` (e.g. ["time"]).
-9. Return ONLY a valid JSON object matching the schema.
+9. If the user says how early to be reminded ("30 minutes before", "an hour before", "a day before"), put the integer number of minutes in `reminder_before_minutes` (1 hour -> 60, 1 day -> 1440). Otherwise leave it null.
+10. Return ONLY a valid JSON object matching the schema.
 
 Few-Shot Examples:
 
@@ -144,7 +149,21 @@ Output:
   "missing_fields": []
 }}
 
-Example 6 (Message with no actionable intent):
+Example 6 (Explicit reminder lead time):
+User: "remind me to call the bank tomorrow at 11am, 30 minutes before"
+Output:
+{{
+  "intent": "CREATE_TASK",
+  "title": "Call the bank",
+  "date_phrase": "tomorrow",
+  "time_phrase": "11am",
+  "duration_minutes": null,
+  "reminder_before_minutes": 30,
+  "priority": null,
+  "missing_fields": []
+}}
+
+Example 7 (Message with no actionable intent):
 User: "how is the weather today?"
 Output:
 {{

@@ -10,8 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -21,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,18 +32,13 @@ class TaskReminderServiceTest {
     private TaskRepository taskRepository;
 
     @Mock
-    private JavaMailSender mailSender;
+    private ReminderEmailSender emailSender;
 
     private TaskReminderService reminderService;
 
     @BeforeEach
     void setUp() {
-        reminderService = new TaskReminderService(
-                taskRepository,
-                mailSender,
-                "sender@example.com",
-                "recipient@example.com"
-        );
+        reminderService = new TaskReminderService(taskRepository, emailSender);
     }
 
     @Test
@@ -55,11 +50,10 @@ class TaskReminderServiceTest {
 
         reminderService.sendReminder(7L);
 
-        ArgumentCaptor<SimpleMailMessage> mail =
-                ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mailSender).send(mail.capture());
-        assertEquals("recipient@example.com", mail.getValue().getTo()[0]);
-        assertEquals("Task reminder: Submit report", mail.getValue().getSubject());
+        verify(emailSender).send(
+                org.mockito.ArgumentMatchers.eq("Task reminder: Submit report"),
+                contains("Submit report")
+        );
         assertTrue(task.getNotified());
 
         ArgumentCaptor<Task> savedTasks = ArgumentCaptor.forClass(Task.class);
@@ -78,7 +72,7 @@ class TaskReminderServiceTest {
 
         reminderService.sendReminder(7L);
 
-        verify(mailSender).send(any(SimpleMailMessage.class));
+        verify(emailSender).send(anyString(), anyString());
         verify(taskRepository).save(task);
         verify(taskRepository, never()).save(
                 org.mockito.ArgumentMatchers.argThat(saved -> saved != task)

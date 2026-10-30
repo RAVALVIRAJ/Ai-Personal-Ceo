@@ -25,6 +25,10 @@ class Settings(BaseSettings):
 
     timezone: str = "Asia/Kolkata"
 
+    # Email reminder lead time used when the user does not say one.
+    # 0 or negative disables the automatic default.
+    default_reminder_before_minutes: int = 15
+
     # App mode label (live | local) – does not change behaviour
     app_mode: str = "local"
 

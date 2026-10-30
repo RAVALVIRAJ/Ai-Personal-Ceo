@@ -36,6 +36,9 @@ services:
       SMTP_STARTTLS_ENABLE: ${SMTP_STARTTLS_ENABLE:-true}
       REMINDER_EMAIL_FROM: ${REMINDER_EMAIL_FROM:-}
       REMINDER_EMAIL_TO: ${REMINDER_EMAIL_TO:-}
+      REMINDERS_ENABLED: ${REMINDERS_ENABLED:-true}
+      REMINDER_EMAIL_PROVIDER: ${REMINDER_EMAIL_PROVIDER:-smtp}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
     ports:
       - "${BACKEND_PORT:-8080}:8080"
@@ -68,6 +71,7 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       TIMEZONE: ${TIMEZONE:-Asia/Kolkata}
+      DEFAULT_REMINDER_BEFORE_MINUTES: ${DEFAULT_REMINDER_BEFORE_MINUTES:-15}
     extra_hosts:
       - host.docker.internal:host-gateway
     ports:
